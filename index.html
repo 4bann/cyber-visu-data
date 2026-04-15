@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Threat Dashboard - Data Visualization</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00f0ff;
+            --secondary: #7c3aed;
+            --accent: #39ff88;
+            --danger: #ff4d6d;
+            --dark: #030711;
+            --dark-elevated: #081224;
+            --panel: rgba(7, 15, 31, 0.82);
+            --panel-border: rgba(0, 240, 255, 0.18);
+            --light: #edf7ff;
+            --muted: rgba(237, 247, 255, 0.72);
+            --grid-line: rgba(0, 240, 255, 0.08);
+            --gradient-hero: linear-gradient(135deg, #030711 0%, #071a35 45%, #180d35 100%);
+            --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Source Sans Pro", sans-serif;
+            background:
+                radial-gradient(circle at 15% 20%, rgba(0, 240, 255, 0.12), transparent 32%),
+                radial-gradient(circle at 85% 10%, rgba(124, 58, 237, 0.18), transparent 30%),
+                linear-gradient(180deg, #02050d 0%, #050913 100%);
+            color: var(--light);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 42px 42px;
+            mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.18));
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(3, 7, 17, 0.55) 70%, rgba(3, 7, 17, 0.9) 100%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero,
+        .visualizations,
+        footer {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 40px;
+            background:
+                linear-gradient(180deg, rgba(3, 7, 17, 0.24) 0%, rgba(3, 7, 17, 0.68) 100%),
+                var(--gradient-hero);
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: 7% 4%;
+            border: 1px solid rgba(0, 240, 255, 0.12);
+            border-radius: 28px;
+            box-shadow:
+                inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+                0 0 80px rgba(0, 240, 255, 0.08);
+            pointer-events: none;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 18% 78%, rgba(57, 255, 136, 0.16), transparent 26%),
+                radial-gradient(circle at 78% 22%, rgba(124, 58, 237, 0.22), transparent 32%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            width: min(1180px, 100%);
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.8fr);
+            gap: 42px;
+            align-items: center;
+        }
+
+        .hero-copy {
+            max-width: 720px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px;
+            border-radius: 999px;
+            border: 1px solid rgba(0, 240, 255, 0.24);
+            background: rgba(0, 240, 255, 0.08);
+            color: var(--primary);
+            font-size: 0.84rem;
+            font-weight: 700;
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+            margin-bottom: 28px;
+        }
+
+        .badge::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 18px var(--accent);
+        }
+
+        .hero h1 {
+            font-family: "Orbitron", sans-serif;
+            font-size: clamp(3.4rem, 8vw, 6.9rem);
+            line-height: 0.92;
+            letter-spacing: 2px;
+            margin-bottom: 22px;
+            text-transform: uppercase;
+        }
+
+        .hero h1 span {
+            display: block;
+            margin-top: 12px;
+            color: var(--primary);
+            font-size: 0.33em;
+            letter-spacing: 9px;
+        }
+
+        .hero-subtitle {
+            font-size: 1.16rem;
+            line-height: 1.8;
+            color: var(--muted);
+            max-width: 680px;
+            margin-bottom: 38px;
+        }
+
+        .hero-subtitle strong {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .stat {
+            background: linear-gradient(180deg, rgba(8, 18, 36, 0.9) 0%, rgba(5, 10, 22, 0.86) 100%);
+            border: 1px solid rgba(0, 240, 255, 0.16);
+            border-radius: 18px;
+            padding: 24px 22px;
+            box-shadow: var(--shadow);
+            min-height: 130px;
+        }
+
+        .stat-value {
+            font-family: "Orbitron", sans-serif;
+            font-size: clamp(2.1rem, 4vw, 3.4rem);
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 10px;
+            text-shadow: 0 0 22px rgba(0, 240, 255, 0.22);
+        }
+
+        .stat-label {
+            font-size: 0.84rem;
+            text-transform: uppercase;
+            letter-spacing: 1.6px;
+            color: rgba(237, 247, 255, 0.54);
+            margin-bottom: 10px;
+        }
+
+        .stat-caption {
+            font-size: 0.96rem;
+            line-height: 1.5;
+            color: var(--muted);
+        }
+
+        .hero-panel {
+            background:
+                linear-gradient(180deg, rgba(8, 18, 36, 0.95) 0%, rgba(5, 12, 24, 0.92) 100%);
+            border: 1px solid rgba(124, 58, 237, 0.24);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hero-panel::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, transparent 0%, rgba(0, 240, 255, 0.08) 48%, transparent 100%),
+                radial-gradient(circle at 85% 10%, rgba(57, 255, 136, 0.14), transparent 28%);
+            opacity: 0.95;
+            pointer-events: none;
+        }
+
+        .panel-header,
+        .panel-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .panel-header {
+            margin-bottom: 24px;
+        }
+
+        .panel-title {
+            font-family: "Orbitron", sans-serif;
+            font-size: 1rem;
+            letter-spacing: 1.8px;
+            color: var(--light);
+            text-transform: uppercase;
+        }
+
+        .panel-pill {
+            border: 1px solid rgba(57, 255, 136, 0.24);
+            background: rgba(57, 255, 136, 0.08);
+            color: var(--accent);
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+        }
+
+        .panel-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+
+        .grid-row {
+            display: grid;
+            grid-template-columns: 150px 1fr 64px;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .grid-label {
+            font-size: 0.88rem;
+            color: rgba(237, 247, 255, 0.78);
+        }
+
+        .grid-bar {
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .grid-bar span {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--secondary), var(--primary));
+            box-shadow: 0 0 18px rgba(0, 240, 255, 0.2);
+        }
+
+        .grid-value {
+            text-align: right;
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.8rem;
+            color: var(--primary);
+        }
+
+        .panel-footer {
+            position: relative;
+            z-index: 1;
+            padding-top: 18px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--muted);
+            font-size: 0.92rem;
+            gap: 18px;
+        }
+
+        .panel-footer strong {
+            color: var(--light);
+            font-weight: 700;
+        }
+
+        .status-line {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-line::before {
+            content: "";
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 14px var(--accent);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(237, 247, 255, 0.48);
+            font-size: 0.82rem;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+        }
+
+        .scroll-indicator svg {
+            width: 28px;
+            height: 28px;
+            stroke: var(--primary);
+        }
+
+        .visualizations {
+            padding: 110px 40px 90px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin: 0 auto 72px;
+            max-width: 720px;
+        }
+
+        .section-header h2 {
+            font-family: "Orbitron", sans-serif;
+            font-size: clamp(2rem, 5vw, 3.4rem);
+            letter-spacing: 3px;
+            margin-bottom: 18px;
+            text-transform: uppercase;
+        }
+
+        .section-header p {
+            color: var(--muted);
+            font-size: 1.08rem;
+            line-height: 1.7;
+        }
+
+        .viz-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 32px;
+            max-width: 1220px;
+            margin: 0 auto;
+        }
+
+        .viz-card {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            border-radius: 24px;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(9, 18, 37, 0.94) 0%, rgba(6, 11, 23, 0.96) 100%);
+            border: 1px solid rgba(0, 240, 255, 0.14);
+            box-shadow: var(--shadow);
+            transition: transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+            position: relative;
+        }
+
+        .viz-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(57, 255, 136, 0.3);
+            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
+        }
+
+        .viz-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto;
+            height: 3px;
+            background: linear-gradient(90deg, var(--secondary), var(--primary), var(--accent));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .viz-card:hover::before {
+            opacity: 1;
+        }
+
+        .viz-preview {
+            position: relative;
+            height: 240px;
+            overflow: hidden;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .viz-preview::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 36px 36px;
+            pointer-events: none;
+        }
+
+        .map-preview {
+            background:
+                radial-gradient(circle at 20% 20%, rgba(0, 240, 255, 0.2), transparent 32%),
+                linear-gradient(180deg, #08162c 0%, #040914 100%);
+        }
+
+        .sankey-preview {
+            background:
+                radial-gradient(circle at 80% 18%, rgba(124, 58, 237, 0.24), transparent 28%),
+                linear-gradient(180deg, #090d23 0%, #040711 100%);
+        }
+
+        .preview-chip {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: var(--primary);
+            border: 1px solid rgba(0, 240, 255, 0.24);
+            background: rgba(0, 240, 255, 0.08);
+        }
+
+        .preview-stage {
+            position: absolute;
+            inset: 24px;
+        }
+
+        .map-node {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 0 7px rgba(0, 240, 255, 0.1), 0 0 28px rgba(0, 240, 255, 0.44);
+        }
+
+        .map-node.accent {
+            background: var(--accent);
+            box-shadow: 0 0 0 9px rgba(57, 255, 136, 0.08), 0 0 28px rgba(57, 255, 136, 0.42);
+        }
+
+        .map-line {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(0, 240, 255, 0), rgba(0, 240, 255, 0.55), rgba(57, 255, 136, 0));
+            transform-origin: left center;
+        }
+
+        .flow-column {
+            position: absolute;
+            top: 42px;
+            bottom: 30px;
+            width: 74px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .flow-column.left {
+            left: 22px;
+        }
+
+        .flow-column.right {
+            right: 22px;
+        }
+
+        .flow-bar {
+            position: absolute;
+            left: 24px;
+            right: 24px;
+            height: 16px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(124, 58, 237, 0.78), rgba(0, 240, 255, 0.78));
+            box-shadow: 0 0 24px rgba(0, 240, 255, 0.18);
+        }
+
+        .flow-bar.alt {
+            background: linear-gradient(90deg, rgba(255, 77, 109, 0.72), rgba(57, 255, 136, 0.72));
+        }
+
+        .viz-content {
+            padding: 30px 30px 32px;
+        }
+
+        .viz-number {
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.88rem;
+            color: var(--primary);
+            letter-spacing: 2.6px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .viz-card h3 {
+            font-family: "Orbitron", sans-serif;
+            font-size: 1.55rem;
+            line-height: 1.3;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+
+        .viz-card p {
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.7;
+            margin-bottom: 24px;
+        }
+
+        .viz-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 13px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(237, 247, 255, 0.72);
+            font-size: 0.8rem;
+        }
+
+        .tag::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent);
+        }
+
+        .viz-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.96rem;
+        }
+
+        .viz-link svg {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .viz-card:hover .viz-link svg {
+            transform: translateX(5px);
+        }
+
+        footer {
+            padding: 58px 40px 72px;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .authors {
+            margin-bottom: 18px;
+        }
+
+        .authors h4 {
+            font-family: "Orbitron", sans-serif;
+            font-size: 1.02rem;
+            letter-spacing: 2px;
+            color: var(--primary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .authors p {
+            color: var(--muted);
+        }
+
+        .footer-info {
+            font-size: 0.9rem;
+            color: rgba(237, 247, 255, 0.46);
+            line-height: 1.7;
+        }
+
+        .footer-info a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        @media (max-width: 1024px) {
+            .hero-content {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-copy {
+                max-width: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .hero,
+            .visualizations,
+            footer {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .hero {
+                padding-top: 36px;
+                padding-bottom: 86px;
+            }
+
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+
+            .grid-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .grid-value {
+                text-align: left;
+            }
+
+            .viz-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 span {
+                letter-spacing: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-copy">
+                <div class="badge">HHS OCR Threat Monitoring</div>
+                <h1>
+                    Cyber Breach
+                    <span>Healthcare Risk Dashboard</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Tableau de bord interactif centré sur les <strong>incidents de cybersécurité santé</strong>
+                    signalés au portail HHS OCR. Explorez la pression des incidents par État,
+                    les volumes de victimes exposées et la distribution des vecteurs de compromission.
+                </p>
+                <div class="stats-row">
+                    <div class="stat">
+                        <div class="stat-value">695</div>
+                        <div class="stat-label">Incidents actifs</div>
+                        <div class="stat-caption">Cas officiels HHS OCR actuellement sous investigation.</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">48</div>
+                        <div class="stat-label">États touchés</div>
+                        <div class="stat-caption">Empreinte géographique des signalements cyber santé.</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">295M</div>
+                        <div class="stat-label">Dossiers exposés</div>
+                        <div class="stat-caption">Volume cumulé d'individus affectés sur la fenêtre active.</div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="hero-panel">
+                <div class="panel-header">
+                    <div class="panel-title">Surface d'attaque observée</div>
+                    <div class="panel-pill">Under Investigation</div>
+                </div>
+                <div class="panel-grid">
+                    <div class="grid-row">
+                        <div class="grid-label">Hacking / IT</div>
+                        <div class="grid-bar"><span style="width: 86.5%;"></span></div>
+                        <div class="grid-value">601</div>
+                    </div>
+                    <div class="grid-row">
+                        <div class="grid-label">Unauthorized Access</div>
+                        <div class="grid-bar"><span style="width: 39%; background: linear-gradient(90deg, var(--secondary), var(--accent));"></span></div>
+                        <div class="grid-value">87</div>
+                    </div>
+                    <div class="grid-row">
+                        <div class="grid-label">Incidents critiques</div>
+                        <div class="grid-bar"><span style="width: 16.7%; background: linear-gradient(90deg, var(--danger), var(--secondary));"></span></div>
+                        <div class="grid-value">116</div>
+                    </div>
+                </div>
+                <div class="panel-footer">
+                    <span class="status-line">Top État (volume): <strong>CA</strong></span>
+                    <span>Source : <strong>HHS OCR Breach Portal</strong></span>
+                </div>
+            </aside>
+        </div>
+
+        <div class="scroll-indicator">
+            <span>Explorer</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M7 10l5 5 5-5"></path>
+            </svg>
+        </div>
+    </section>
+
+    <section class="visualizations">
+        <div class="section-header">
+            <h2>Visualisations</h2>
+            <p>
+                Deux vues complémentaires pour lire le risque : une carte choroplèthe des États-Unis
+                et un Sankey qui relie les types de brèche aux classes d'impact.
+            </p>
+        </div>
+
+        <div class="viz-grid">
+            <a href="map-cyber.html" class="viz-card">
+                <div class="viz-preview map-preview">
+                    <div class="preview-chip">Carte USA</div>
+                    <div class="preview-stage">
+                        <span class="map-node" style="top: 30px; left: 72px;"></span>
+                        <span class="map-node accent" style="top: 92px; left: 128px;"></span>
+                        <span class="map-node" style="top: 132px; left: 214px;"></span>
+                        <span class="map-node accent" style="top: 56px; left: 248px;"></span>
+                        <span class="map-node" style="top: 146px; right: 76px;"></span>
+                        <span class="map-node accent" style="top: 106px; right: 122px;"></span>
+                        <span class="map-line" style="width: 108px; top: 37px; left: 82px; transform: rotate(32deg);"></span>
+                        <span class="map-line" style="width: 124px; top: 98px; left: 139px; transform: rotate(14deg);"></span>
+                        <span class="map-line" style="width: 126px; top: 136px; left: 226px; transform: rotate(-18deg);"></span>
+                    </div>
+                </div>
+                <div class="viz-content">
+                    <div class="viz-number">Visualisation 01</div>
+                    <h3>Cartographie des incidents</h3>
+                    <p>
+                        Lecture choroplèthe des signalements HHS OCR par État. Trois modes d'analyse :
+                        nombre d'incidents, volume d'individus affectés et part d'incidents critiques.
+                    </p>
+                    <div class="viz-tags">
+                        <span class="tag">Carte interactive</span>
+                        <span class="tag">KPI par État</span>
+                        <span class="tag">Risk Monitoring</span>
+                    </div>
+                    <span class="viz-link">
+                        Explorer la carte
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"></path>
+                        </svg>
+                    </span>
+                </div>
+            </a>
+
+            <a href="sankey-cyber.html" class="viz-card">
+                <div class="viz-preview sankey-preview">
+                    <div class="preview-chip">Flow Analysis</div>
+                    <div class="preview-stage">
+                        <div class="flow-column left"></div>
+                        <div class="flow-column right"></div>
+                        <div class="flow-bar" style="top: 52px;"></div>
+                        <div class="flow-bar alt" style="top: 98px; width: calc(100% - 80px);"></div>
+                        <div class="flow-bar" style="top: 146px; width: calc(100% - 130px);"></div>
+                    </div>
+                </div>
+                <div class="viz-content">
+                    <div class="viz-number">Visualisation 02</div>
+                    <h3>Flux des types de brèche</h3>
+                    <p>
+                        Diagramme Sankey reliant les vecteurs de compromission aux classes d'impact.
+                        Il montre comment les familles d'incidents se distribuent du seuil légal minimal
+                        jusqu'aux brèches millionnaires.
+                    </p>
+                    <div class="viz-tags">
+                        <span class="tag">Sankey</span>
+                        <span class="tag">Impact tiers</span>
+                        <span class="tag">Threat vectors</span>
+                    </div>
+                    <span class="viz-link">
+                        Explorer le diagramme
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"></path>
+                        </svg>
+                    </span>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <footer>
+        <div class="authors">
+            <h4>Réalisé par</h4>
+            <p>Alban GUERET, Roméo CARECCHIO &amp; Thushsan Rathnayaka</p>
+        </div>
+        <div class="footer-info">
+            <p>Projet Visualisation Data — ESILV 2025-2026</p>
+            <p>Données : <a href="https://ocrportal.hhs.gov/ocr/breach/breach_report_hip.jsf" target="_blank">HHS OCR Breach Portal</a></p>
+        </div>
+    </footer>
+</body>
+</html>

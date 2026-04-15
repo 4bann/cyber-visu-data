@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Threat Dashboard - Flux des Brèches</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00f0ff;
+            --secondary: #7c3aed;
+            --accent: #39ff88;
+            --danger: #ff4d6d;
+            --dark: #030711;
+            --panel: rgba(8, 18, 36, 0.92);
+            --panel-border: rgba(0, 240, 255, 0.16);
+            --light: #edf7ff;
+            --muted: rgba(237, 247, 255, 0.7);
+            --grid-line: rgba(0, 240, 255, 0.07);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Source Sans Pro", sans-serif;
+            background:
+                radial-gradient(circle at 16% 18%, rgba(0, 240, 255, 0.1), transparent 28%),
+                radial-gradient(circle at 84% 15%, rgba(124, 58, 237, 0.18), transparent 30%),
+                linear-gradient(180deg, #02050d 0%, #050913 100%);
+            min-height: 100vh;
+            padding: 34px;
+            color: var(--light);
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 38px 38px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .page-shell {
+            position: relative;
+            z-index: 1;
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(237, 247, 255, 0.58);
+            text-decoration: none;
+            font-size: 0.92rem;
+            margin-bottom: 30px;
+            transition: color 0.3s ease;
+        }
+
+        .back-link:hover {
+            color: var(--accent);
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        header {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 20px;
+            align-items: end;
+            margin-bottom: 28px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(124, 58, 237, 0.26);
+            background: rgba(124, 58, 237, 0.08);
+            color: #d7c3ff;
+            font-size: 0.8rem;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 16px var(--primary);
+        }
+
+        h1 {
+            font-family: "Orbitron", sans-serif;
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            letter-spacing: 2px;
+            line-height: 1.14;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 1.02rem;
+            line-height: 1.7;
+            max-width: 760px;
+        }
+
+        .header-badge {
+            justify-self: end;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(0, 240, 255, 0.18);
+            background: rgba(7, 15, 31, 0.76);
+            color: var(--muted);
+            min-width: 230px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 16px var(--accent);
+            flex: none;
+        }
+
+        .header-badge strong {
+            display: block;
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.88rem;
+            color: var(--light);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+
+        .header-badge span {
+            font-size: 0.84rem;
+            color: rgba(237, 247, 255, 0.56);
+        }
+
+        #chart {
+            background:
+                linear-gradient(180deg, rgba(8, 18, 36, 0.95) 0%, rgba(5, 10, 22, 0.94) 100%);
+            border-radius: 24px;
+            padding: 28px;
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.46);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #chart::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, transparent 0%, rgba(0, 240, 255, 0.04) 42%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .node rect {
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        .node rect:hover {
+            opacity: 0.84;
+        }
+
+        .node text {
+            font-family: "Source Sans Pro", sans-serif;
+            font-size: 12.5px;
+            font-weight: 600;
+            fill: var(--light);
+            pointer-events: none;
+        }
+
+        .link {
+            fill: none;
+            stroke-opacity: 0.38;
+            transition: stroke-opacity 0.3s ease;
+        }
+
+        .link:hover {
+            stroke-opacity: 0.78;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: rgba(3, 7, 17, 0.96);
+            color: var(--light);
+            padding: 16px 18px;
+            border-radius: 16px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 240, 255, 0.16);
+            max-width: 320px;
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+        }
+
+        .tooltip strong {
+            color: var(--primary);
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.98rem;
+            letter-spacing: 1px;
+        }
+
+        .tooltip .flow-arrow {
+            color: rgba(237, 247, 255, 0.4);
+            margin: 0 8px;
+        }
+
+        .tooltip .count {
+            display: block;
+            margin-top: 8px;
+            font-size: 1.36rem;
+            font-family: "Orbitron", sans-serif;
+            color: var(--light);
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 28px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.88rem;
+            color: rgba(237, 247, 255, 0.74);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 9px 15px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+        }
+
+        .info-section {
+            max-width: 1280px;
+            margin: 28px auto 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 18px;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 18px;
+            padding: 22px;
+        }
+
+        .info-card h3 {
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.98rem;
+            letter-spacing: 1.4px;
+            color: var(--primary);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .info-card p {
+            color: var(--muted);
+            font-size: 0.94rem;
+            line-height: 1.7;
+        }
+
+        .info-card ul {
+            list-style: none;
+            margin-top: 12px;
+        }
+
+        .info-card li {
+            color: rgba(237, 247, 255, 0.76);
+            font-size: 0.88rem;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .info-card li:last-child {
+            border-bottom: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 64px;
+            color: rgba(237, 247, 255, 0.56);
+        }
+
+        .loading-spinner {
+            width: 42px;
+            height: 42px;
+            border: 3px solid rgba(255, 255, 255, 0.08);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 900px) {
+            header {
+                grid-template-columns: 1fr;
+            }
+
+            .header-badge {
+                justify-self: start;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px;
+            }
+
+            #chart {
+                padding: 18px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .legend {
+                gap: 10px;
+            }
+
+            .legend-item {
+                padding: 8px 12px;
+                font-size: 0.82rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-shell">
+        <a href="index.html" class="back-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"></path>
+            </svg>
+            Retour au dashboard
+        </a>
+
+        <header>
+            <div>
+                <div class="eyebrow">Breach Flow Analysis</div>
+                <h1>Flux des types de brèche vers l'impact</h1>
+                <p class="subtitle" id="subtitle">Chargement des incidents HHS OCR...</p>
+            </div>
+
+            <div class="header-badge">
+                <span class="status-dot"></span>
+                <div>
+                    <strong>Impact tiers</strong>
+                    <span>Classification à partir du nombre d'individus affectés</span>
+                </div>
+            </div>
+        </header>
+
+        <div id="chart">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Chargement du diagramme Sankey...</p>
+            </div>
+        </div>
+
+        <div class="legend" id="legend"></div>
+
+        <div class="info-section">
+            <div class="info-card">
+                <h3>Classes d'impact</h3>
+                <p>Les incidents sont regroupés en cinq niveaux pour conserver une lecture claire de la gravité.</p>
+                <ul>
+                    <li>500-999</li>
+                    <li>1k-9.9k</li>
+                    <li>10k-99.9k</li>
+                    <li>100k-999.9k</li>
+                    <li>1M+</li>
+                </ul>
+            </div>
+            <div class="info-card">
+                <h3>Lecture du flux</h3>
+                <p>
+                    La colonne de gauche représente les types de brèche remontés au portail HHS OCR.
+                    La colonne de droite montre le niveau d'impact atteint. Plus le lien est épais,
+                    plus la combinaison est fréquente.
+                </p>
+            </div>
+            <div class="info-card">
+                <h3>Signal clé</h3>
+                <p>
+                    Les incidents "Hacking / IT" dominent très largement le graphe et alimentent
+                    la majorité des tiers d'impact élevés, ce qui confirme leur poids systémique
+                    dans le paysage santé observé.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        const breachColors = {
+            "Hacking/IT Incident": "#00f0ff",
+            "Unauthorized Access/Disclosure": "#39ff88",
+            "Theft": "#ffd166",
+            "Loss": "#ff9f1c",
+            "Improper Disposal": "#ff4d6d",
+            "Other": "#7c3aed"
+        };
+
+        const impactColors = {
+            "500-999": "#143a5f",
+            "1k-9.9k": "#14638f",
+            "10k-99.9k": "#00f0ff",
+            "100k-999.9k": "#7c3aed",
+            "1M+": "#ff4d6d"
+        };
+
+        const impactOrder = ["500-999", "1k-9.9k", "10k-99.9k", "100k-999.9k", "1M+"];
+
+        const integerFormatter = new Intl.NumberFormat("fr-FR");
+
+        function formatInteger(value) {
+            return integerFormatter.format(value);
+        }
+
+        function getImpactTier(individualsAffected) {
+            if (individualsAffected < 1000) {
+                return "500-999";
+            }
+            if (individualsAffected < 10000) {
+                return "1k-9.9k";
+            }
+            if (individualsAffected < 100000) {
+                return "10k-99.9k";
+            }
+            if (individualsAffected < 1000000) {
+                return "100k-999.9k";
+            }
+            return "1M+";
+        }
+
+        d3.csv("data/cyber-incidents.csv", d => ({
+            state: d.State,
+            breachType: d["Type of Breach"],
+            coveredEntityType: d["Covered Entity Type"],
+            individualsAffected: +d["Individuals Affected"],
+            businessAssociatePresent: d["Business Associate Present"]
+        })).then(rawData => {
+            const data = rawData.filter(d => d.breachType && d.individualsAffected >= 500);
+            const breachCounts = d3.rollup(data, v => v.length, d => d.breachType);
+            const majorTypes = new Set(
+                Array.from(breachCounts.entries())
+                    .filter(([, count]) => count >= 10)
+                    .map(([type]) => type)
+            );
+
+            const incidents = data.map(d => ({
+                ...d,
+                groupedType: majorTypes.has(d.breachType) ? d.breachType : "Other",
+                impactTier: getImpactTier(d.individualsAffected)
+            }));
+
+            const groupedCounts = d3.rollup(incidents, v => v.length, d => d.groupedType);
+            const sourceOrder = Array.from(groupedCounts.keys()).sort((a, b) =>
+                d3.descending(groupedCounts.get(a), groupedCounts.get(b))
+            );
+
+            const flowCounts = d3.rollup(
+                incidents,
+                v => v.length,
+                d => d.groupedType,
+                d => d.impactTier
+            );
+
+            const nodes = [...sourceOrder, ...impactOrder].map(name => ({ name }));
+            const nodeIndex = new Map(nodes.map((node, index) => [node.name, index]));
+            const links = [];
+
+            flowCounts.forEach((targets, source) => {
+                targets.forEach((count, impactTier) => {
+                    links.push({
+                        source: nodeIndex.get(source),
+                        target: nodeIndex.get(impactTier),
+                        value: count
+                    });
+                });
+            });
+
+            document.getElementById("subtitle").textContent =
+                `${formatInteger(incidents.length)} incidents analysés — Du type de brèche au niveau d'impact`;
+
+            document.querySelector("#chart").innerHTML = "";
+            drawSankey({ nodes, links }, incidents.length, sourceOrder);
+        }).catch(error => {
+            console.error("Erreur de chargement :", error);
+            document.querySelector("#chart").innerHTML = `
+                <div class="loading">
+                    <p style="color: #ff4d6d;">Erreur de chargement des données</p>
+                    <p style="font-size: 0.86rem; margin-top: 10px;">Vérifiez que cyber-incidents.csv contient les incidents cybersécurité.</p>
+                </div>
+            `;
+        });
+
+        function drawSankey(data, totalIncidents, sourceOrder) {
+            const width = 1160;
+            const height = 640;
+
+            const svg = d3.select("#chart")
+                .append("svg")
+                .attr("viewBox", `0 0 ${width} ${height}`);
+
+            const sankey = d3.sankey()
+                .nodeId(d => d.index)
+                .nodeWidth(22)
+                .nodePadding(22)
+                .nodeSort(null)
+                .extent([[40, 30], [width - 40, height - 30]]);
+
+            const { nodes, links } = sankey(data);
+            const tooltip = d3.select("#tooltip");
+
+            const defs = svg.append("defs");
+
+            links.forEach((link, index) => {
+                const gradient = defs.append("linearGradient")
+                    .attr("id", `gradient-${index}`)
+                    .attr("gradientUnits", "userSpaceOnUse")
+                    .attr("x1", link.source.x1)
+                    .attr("x2", link.target.x0);
+
+                gradient.append("stop")
+                    .attr("offset", "0%")
+                    .attr("stop-color", breachColors[link.source.name] || "#7c3aed");
+
+                gradient.append("stop")
+                    .attr("offset", "100%")
+                    .attr("stop-color", impactColors[link.target.name] || "#00f0ff");
+            });
+
+            svg.append("g")
+                .selectAll("path")
+                .data(links)
+                .join("path")
+                .attr("class", "link")
+                .attr("d", d3.sankeyLinkHorizontal())
+                .attr("stroke-width", d => Math.max(1, d.width))
+                .attr("stroke", (d, index) => `url(#gradient-${index})`)
+                .on("mouseover", (event, d) => {
+                    const percent = ((d.value / d.source.value) * 100).toFixed(1);
+                    tooltip.style("opacity", 1)
+                        .html(`
+                            <strong>${d.source.name}</strong>
+                            <span class="flow-arrow">→</span>
+                            <strong>${d.target.name}</strong>
+                            <span class="count">${formatInteger(d.value)} incidents</span>
+                            <span style="color: rgba(237,247,255,0.55); font-size: 0.84rem;">${percent}% des incidents de cette famille</span>
+                        `);
+                })
+                .on("mousemove", event => {
+                    tooltip.style("left", `${event.clientX + 18}px`)
+                        .style("top", `${event.clientY - 12}px`);
+                })
+                .on("mouseout", () => tooltip.style("opacity", 0));
+
+            const node = svg.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .join("g")
+                .attr("class", "node");
+
+            node.append("rect")
+                .attr("x", d => d.x0)
+                .attr("y", d => d.y0)
+                .attr("height", d => d.y1 - d.y0)
+                .attr("width", d => d.x1 - d.x0)
+                .attr("fill", d => breachColors[d.name] || impactColors[d.name] || "#00f0ff")
+                .attr("rx", 5)
+                .on("mouseover", (event, d) => {
+                    const percent = ((d.value / totalIncidents) * 100).toFixed(1);
+                    tooltip.style("opacity", 1)
+                        .html(`
+                            <strong>${d.name}</strong>
+                            <span class="count">${formatInteger(d.value)} incidents</span>
+                            <span style="color: rgba(237,247,255,0.55); font-size: 0.84rem;">${percent}% du total</span>
+                        `);
+                })
+                .on("mousemove", event => {
+                    tooltip.style("left", `${event.clientX + 18}px`)
+                        .style("top", `${event.clientY - 12}px`);
+                })
+                .on("mouseout", () => tooltip.style("opacity", 0));
+
+            node.append("text")
+                .attr("x", d => d.x0 < width / 2 ? d.x1 + 10 : d.x0 - 10)
+                .attr("y", d => (d.y1 + d.y0) / 2)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", d => d.x0 < width / 2 ? "start" : "end")
+                .text(d => d.name);
+
+            const legend = d3.select("#legend");
+            sourceOrder.forEach(name => {
+                legend.append("div")
+                    .attr("class", "legend-item")
+                    .html(`<div class="legend-color" style="background:${breachColors[name] || "#7c3aed"}"></div>${name}`);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Threat Dashboard - Cartographie des Incidents</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00f0ff;
+            --secondary: #7c3aed;
+            --accent: #39ff88;
+            --danger: #ff4d6d;
+            --dark: #030711;
+            --dark-elevated: #081224;
+            --panel: rgba(8, 18, 36, 0.9);
+            --panel-border: rgba(0, 240, 255, 0.18);
+            --light: #edf7ff;
+            --muted: rgba(237, 247, 255, 0.7);
+            --grid-line: rgba(0, 240, 255, 0.07);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Source Sans Pro", sans-serif;
+            background:
+                radial-gradient(circle at 15% 20%, rgba(0, 240, 255, 0.12), transparent 30%),
+                radial-gradient(circle at 84% 14%, rgba(124, 58, 237, 0.18), transparent 32%),
+                linear-gradient(180deg, #02050d 0%, #050913 100%);
+            min-height: 100vh;
+            padding: 34px;
+            color: var(--light);
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 38px 38px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .page-shell {
+            position: relative;
+            z-index: 1;
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(237, 247, 255, 0.58);
+            text-decoration: none;
+            font-size: 0.92rem;
+            margin-bottom: 30px;
+            transition: color 0.3s ease;
+        }
+
+        .back-link:hover {
+            color: var(--accent);
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        header {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 20px;
+            align-items: end;
+            margin-bottom: 28px;
+        }
+
+        .headline {
+            max-width: 760px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            background: rgba(0, 240, 255, 0.08);
+            color: var(--primary);
+            font-size: 0.8rem;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 16px var(--accent);
+        }
+
+        h1 {
+            font-family: "Orbitron", sans-serif;
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            letter-spacing: 2px;
+            line-height: 1.14;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 1.02rem;
+            line-height: 1.7;
+        }
+
+        .header-badge {
+            justify-self: end;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(124, 58, 237, 0.22);
+            background: rgba(7, 15, 31, 0.76);
+            color: var(--muted);
+            min-width: 210px;
+        }
+
+        .header-badge strong {
+            display: block;
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.9rem;
+            color: var(--light);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+
+        .header-badge span {
+            font-size: 0.84rem;
+            color: rgba(237, 247, 255, 0.56);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 16px var(--accent);
+            flex: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .controls button {
+            padding: 12px 22px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            cursor: pointer;
+            font-family: "Source Sans Pro", sans-serif;
+            font-size: 0.94rem;
+            font-weight: 700;
+            transition: transform 0.2s ease, border-color 0.3s ease, background 0.3s ease;
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(237, 247, 255, 0.8);
+        }
+
+        .controls button:hover {
+            transform: translateY(-1px);
+            border-color: rgba(0, 240, 255, 0.2);
+        }
+
+        .controls button.active {
+            background: linear-gradient(90deg, rgba(124, 58, 237, 0.7), rgba(0, 240, 255, 0.28));
+            border-color: rgba(0, 240, 255, 0.3);
+            color: white;
+            box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+        }
+
+        #chart {
+            background:
+                linear-gradient(180deg, rgba(8, 18, 36, 0.95) 0%, rgba(5, 10, 22, 0.93) 100%);
+            border-radius: 24px;
+            padding: 28px;
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.46);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #chart::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, transparent 0%, rgba(0, 240, 255, 0.04) 40%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .state {
+            stroke: rgba(4, 7, 13, 0.9);
+            stroke-width: 0.7;
+            cursor: pointer;
+            transition: opacity 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
+        }
+
+        .state:hover {
+            opacity: 0.88;
+            stroke: var(--accent);
+            stroke-width: 1.8;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: rgba(3, 7, 17, 0.96);
+            color: var(--light);
+            padding: 16px 18px;
+            border-radius: 16px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 240, 255, 0.16);
+            min-width: 250px;
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+        }
+
+        .tooltip strong {
+            color: var(--primary);
+            font-family: "Orbitron", sans-serif;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .tooltip-row:first-of-type {
+            border-top: none;
+            margin-top: 0;
+            padding-top: 0;
+        }
+
+        .tooltip-label {
+            color: rgba(237, 247, 255, 0.54);
+        }
+
+        .tooltip-value {
+            color: var(--light);
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 28px;
+        }
+
+        .legend-container {
+            width: min(460px, 100%);
+        }
+
+        .legend-title {
+            text-align: center;
+            font-size: 0.86rem;
+            color: rgba(237, 247, 255, 0.56);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+        }
+
+        .legend-bar {
+            width: 100%;
+            height: 14px;
+            border-radius: 999px;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+        }
+
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-size: 0.84rem;
+            color: rgba(237, 247, 255, 0.6);
+            margin-top: 10px;
+            gap: 18px;
+        }
+
+        .info-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-top: 28px;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 18px;
+            padding: 20px;
+        }
+
+        .info-card h3 {
+            font-family: "Orbitron", sans-serif;
+            font-size: 0.98rem;
+            letter-spacing: 1.4px;
+            color: var(--primary);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .info-card p {
+            color: var(--muted);
+            font-size: 0.94rem;
+            line-height: 1.65;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 64px;
+            color: rgba(237, 247, 255, 0.56);
+        }
+
+        .loading-spinner {
+            width: 42px;
+            height: 42px;
+            border: 3px solid rgba(255, 255, 255, 0.08);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 900px) {
+            header {
+                grid-template-columns: 1fr;
+            }
+
+            .header-badge {
+                justify-self: start;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px;
+            }
+
+            #chart {
+                padding: 18px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .controls {
+                gap: 10px;
+            }
+
+            .controls button {
+                padding: 10px 16px;
+                font-size: 0.86rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-shell">
+        <a href="index.html" class="back-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"></path>
+            </svg>
+            Retour au dashboard
+        </a>
+
+        <header>
+            <div class="headline">
+                <div class="eyebrow">Cyber Cartography</div>
+                <h1>Cartographie des incidents cyber santé</h1>
+                <p class="subtitle" id="subtitle">Chargement des indicateurs HHS OCR...</p>
+            </div>
+
+            <div class="header-badge">
+                <span class="status-dot"></span>
+                <div>
+                    <strong>Source officielle</strong>
+                    <span>HHS OCR - Under Investigation</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="controls">
+            <button id="btn-count" class="active">Incidents signalés</button>
+            <button id="btn-time">Victimes concernées</button>
+            <button id="btn-temp">Part d'incidents critiques</button>
+        </div>
+
+        <div id="chart">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Chargement de la carte des incidents...</p>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-container">
+                <div class="legend-title" id="legend-title">Échelle</div>
+                <div class="legend-bar" id="legend-bar"></div>
+                <div class="legend-labels">
+                    <span id="label-min"></span>
+                    <span id="label-max"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-strip">
+            <div class="info-card">
+                <h3>Incidents critiques</h3>
+                <p>Un incident critique correspond ici à une brèche avec au moins 100&nbsp;000 individus affectés.</p>
+            </div>
+            <div class="info-card">
+                <h3>Lecture rapide</h3>
+                <p>Le mode "Victimes concernées" utilise une échelle logarithmique pour rester lisible malgré les très gros écarts entre États.</p>
+            </div>
+            <div class="info-card">
+                <h3>Signal dominant</h3>
+                <p>La majorité des États sont dominés par les incidents "Hacking / IT", reflet d'une pression offensive persistante sur les infrastructures santé.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        const stateNames = {
+            AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas",
+            CA: "California", CO: "Colorado", CT: "Connecticut", DE: "Delaware",
+            DC: "District of Columbia", FL: "Florida", GA: "Georgia", HI: "Hawaii",
+            ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa",
+            KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine",
+            MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
+            MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska",
+            NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico",
+            NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio",
+            OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island",
+            SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas",
+            UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington",
+            WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
+        };
+
+        const nameToAbbr = Object.fromEntries(
+            Object.entries(stateNames).map(([abbr, name]) => [name, abbr])
+        );
+
+        const compactFormatter = new Intl.NumberFormat("fr-FR", {
+            notation: "compact",
+            maximumFractionDigits: 1
+        });
+
+        const integerFormatter = new Intl.NumberFormat("fr-FR");
+
+        const percentFormatter = new Intl.NumberFormat("fr-FR", {
+            style: "percent",
+            maximumFractionDigits: 1
+        });
+
+        function formatCompact(value) {
+            return compactFormatter.format(value);
+        }
+
+        function formatInteger(value) {
+            return integerFormatter.format(value);
+        }
+
+        function formatPercent(value) {
+            return percentFormatter.format(value);
+        }
+
+        const cyberInterpolation = d3.interpolateRgbBasis(["#0a1224", "#165f8c", "#00f0ff", "#39ff88"]);
+        const impactInterpolation = d3.interpolateRgbBasis(["#08111f", "#2b2e7d", "#7c3aed", "#ff4d6d"]);
+
+        let stateData = {};
+        let stateRows = [];
+        let currentMode = "incidents";
+
+        Promise.all([
+            d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"),
+            d3.csv("data/cyber-state-kpis.csv", d => ({
+                state: d.State,
+                incidentCount: +d["Incident Count"],
+                affectedTotal: +d["Individuals Affected Total"],
+                criticalShare: +d["Critical Incident Share"],
+                topBreachType: d["Top Breach Type"]
+            }))
+        ]).then(([us, rows]) => {
+            stateRows = rows.filter(d => d.state);
+            stateData = Object.fromEntries(stateRows.map(d => [d.state, d]));
+
+            const totalIncidents = d3.sum(stateRows, d => d.incidentCount);
+            document.getElementById("subtitle").textContent =
+                `${formatInteger(totalIncidents)} incidents HHS OCR répartis sur ${stateRows.length} États`;
+
+            document.querySelector("#chart").innerHTML = "";
+            drawMap(us);
+            updateColors();
+        }).catch(error => {
+            console.error("Erreur de chargement :", error);
+            document.querySelector("#chart").innerHTML = `
+                <div class="loading">
+                    <p style="color: #ff4d6d;">Erreur de chargement des données</p>
+                    <p style="font-size: 0.86rem; margin-top: 10px;">Vérifiez que les CSV cyber sont présents dans le dossier data/</p>
+                </div>
+            `;
+        });
+
+        function drawMap(us) {
+            const width = 1120;
+            const height = 640;
+
+            const svg = d3.select("#chart")
+                .append("svg")
+                .attr("viewBox", `0 0 ${width} ${height}`);
+
+            const projection = d3.geoAlbersUsa()
+                .fitSize([width, height], topojson.feature(us, us.objects.states));
+
+            const path = d3.geoPath().projection(projection);
+            const states = topojson.feature(us, us.objects.states).features;
+            const tooltip = d3.select("#tooltip");
+
+            svg.append("g")
+                .selectAll("path")
+                .data(states)
+                .join("path")
+                .attr("class", "state")
+                .attr("d", path)
+                .attr("data-state", d => d.properties.name)
+                .on("mouseover", (event, d) => {
+                    const abbr = nameToAbbr[d.properties.name];
+                    const info = stateData[abbr];
+
+                    if (info) {
+                        tooltip.style("opacity", 1).html(`
+                            <strong>${d.properties.name}</strong>
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">Incidents</span>
+                                <span class="tooltip-value">${formatInteger(info.incidentCount)}</span>
+                            </div>
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">Victimes</span>
+                                <span class="tooltip-value">${formatInteger(info.affectedTotal)}</span>
+                            </div>
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">Part critique</span>
+                                <span class="tooltip-value">${formatPercent(info.criticalShare)}</span>
+                            </div>
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">Vecteur dominant</span>
+                                <span class="tooltip-value">${info.topBreachType}</span>
+                            </div>
+                        `);
+                    } else {
+                        tooltip.style("opacity", 1).html(`
+                            <strong>${d.properties.name}</strong>
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">Statut</span>
+                                <span class="tooltip-value">Aucun incident agrégé</span>
+                            </div>
+                        `);
+                    }
+                })
+                .on("mousemove", event => {
+                    tooltip.style("left", `${event.clientX + 18}px`)
+                        .style("top", `${event.clientY - 12}px`);
+                })
+                .on("mouseout", () => tooltip.style("opacity", 0));
+        }
+
+        function updateColors() {
+            let colorScale;
+            let minLabel;
+            let maxLabel;
+            let gradient;
+            let legendTitle;
+
+            if (currentMode === "incidents") {
+                const values = stateRows.map(d => d.incidentCount);
+                const maxValue = d3.max(values);
+                const scale = d3.scalePow().exponent(0.55).domain([0, maxValue]).range([0, 1]);
+                colorScale = value => cyberInterpolation(scale(value));
+                minLabel = "0 incident";
+                maxLabel = `${formatInteger(maxValue)} incidents`;
+                gradient = "linear-gradient(90deg, #0a1224 0%, #165f8c 50%, #39ff88 100%)";
+                legendTitle = "Incidents signalés";
+            } else if (currentMode === "victims") {
+                const values = stateRows.map(d => d.affectedTotal).filter(Boolean);
+                const minValue = d3.min(values);
+                const maxValue = d3.max(values);
+                const scale = d3.scaleLog()
+                    .domain([Math.max(1, minValue), maxValue])
+                    .range([0, 1]);
+
+                colorScale = value => cyberInterpolation(scale(Math.max(1, value)));
+                minLabel = `${formatCompact(minValue)} dossiers`;
+                maxLabel = `${formatCompact(maxValue)} dossiers`;
+                gradient = "linear-gradient(90deg, #0a1224 0%, #126782 45%, #00f0ff 75%, #39ff88 100%)";
+                legendTitle = "Victimes concernées";
+            } else {
+                const values = stateRows.map(d => d.criticalShare);
+                const maxValue = d3.max(values);
+                const scale = d3.scaleLinear().domain([0, maxValue]).range([0, 1]);
+                colorScale = value => impactInterpolation(scale(value));
+                minLabel = "0%";
+                maxLabel = formatPercent(maxValue);
+                gradient = "linear-gradient(90deg, #08111f 0%, #2b2e7d 38%, #7c3aed 72%, #ff4d6d 100%)";
+                legendTitle = "Part d'incidents critiques";
+            }
+
+            d3.selectAll(".state")
+                .transition()
+                .duration(500)
+                .attr("fill", function() {
+                    const stateName = d3.select(this).attr("data-state");
+                    const abbr = nameToAbbr[stateName];
+                    const info = stateData[abbr];
+
+                    if (!info) {
+                        return "#09101e";
+                    }
+
+                    if (currentMode === "incidents") {
+                        return colorScale(info.incidentCount);
+                    }
+
+                    if (currentMode === "victims") {
+                        return colorScale(info.affectedTotal);
+                    }
+
+                    return colorScale(info.criticalShare);
+                });
+
+            document.getElementById("legend-title").textContent = legendTitle;
+            document.getElementById("legend-bar").style.background = gradient;
+            document.getElementById("label-min").textContent = minLabel;
+            document.getElementById("label-max").textContent = maxLabel;
+        }
+
+        document.getElementById("btn-count").addEventListener("click", function() {
+            currentMode = "incidents";
+            document.querySelectorAll(".controls button").forEach(button => button.classList.remove("active"));
+            this.classList.add("active");
+            updateColors();
+        });
+
+        document.getElementById("btn-time").addEventListener("click", function() {
+            currentMode = "victims";
+            document.querySelectorAll(".controls button").forEach(button => button.classList.remove("active"));
+            this.classList.add("active");
+            updateColors();
+        });
+
+        document.getElementById("btn-temp").addEventListener("click", function() {
+            currentMode = "critical";
+            document.querySelectorAll(".controls button").forEach(button => button.classList.remove("active"));
+            this.classList.add("active");
+            updateColors();
+        });
+    </script>
+</body>
+</html>
